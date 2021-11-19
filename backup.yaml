@@ -1,0 +1,22 @@
+apiVersion: v1
+data:
+  ingress.override: |
+    rewrite name vault.aaw.cloud.statcan.ca istio-ingressgateway.istio-system.svc.cluster.local
+    rewrite name minio-standard-tenant-1.covid.cloud.statcan.ca istio-ingressgateway.istio-system.svc.cluster.local
+    rewrite name minio-premium-tenant-1.covid.cloud.statcan.ca istio-ingressgateway.istio-system.svc.cluster.local
+    rewrite name analytics-platform.statcan.gc.ca istio-ingressgateway.istio-system.svc.cluster.local
+    rewrite name plateforme-analyse.statcan.gc.ca istio-ingressgateway.istio-system.svc.cluster.local
+  kfserving-ingress.override: |
+    rewrite name max-object-detector.zachary-seguin.aaw.cloud.statcan.ca istio-ingressgateway.istio-system.svc.cluster.local
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2021-05-17T14:29:47Z"
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+  name: coredns-custom
+  namespace: kube-system
+  resourceVersion: "305855702"
+  selfLink: /api/v1/namespaces/kube-system/configmaps/coredns-custom
+  uid: dcf880e8-f54b-413c-a763-3a93237f9f66
