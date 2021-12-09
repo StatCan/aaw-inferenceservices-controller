@@ -146,3 +146,28 @@ tasks:
     desc: stop knative environment
     cmds:
     - "k3d cluster stop {{.CLUSTER_NAME}}"
+
+  app:knative:operator:
+    desc: install operator(s)
+    cmds:
+    - "{{.KUBECTL}} create ns knative-operator || true"
+    - "{{.KUSTOMIZE}} cluster/apps/knative-operator"
+    - "{{.KUBEWAIT_AVAIL}} --timeout=120s -n knative-operator deployment/knative-operator"
+
+  app:knative:
+    desc: install knative serving/eventing
+    cmds:
+    - "{{.KUSTOMIZE}} cluster/apps/knative"
+    - "{{.KUBEWAIT_READY}} --timeout=300s -n knative-eventing knativeeventing/eventing"
+    - "{{.KUBEWAIT_READY}} --timeout=300s -n knative-serving knativeserving/serving"
+
+  app:kserve:
+    desc: install kserve
+    cmds:
+    - "{{.KUSTOMIZE}} cluster/apps/kserve"
+
+  app:bootstrap:
+    desc: bootstrap local knative environment
+    cmds:
+    - task: app:knative:operator
+    - task: app:knative

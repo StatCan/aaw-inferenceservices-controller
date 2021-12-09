@@ -18,7 +18,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&kubeconfig, "kubeconfig", "", "Path to the Kubeconfig file")
 }
 
-// Execute executes the root command.
 func Execute() error {
 	return rootCmd.Execute()
 }

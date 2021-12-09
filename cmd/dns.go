@@ -1,15 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/StatCan/inferenceservices-controller/pkg/signals"
-	servingv1alpha2 "github.com/kubeflow/kfserving/pkg/apis/serving/v1alpha2"
-	servingclientset "github.com/kubeflow/kfserving/pkg/client/clientset/versioned"
-	servinginformers "github.com/kubeflow/kfserving/pkg/client/informers/externalversions"
-	servingv1alpha2listers "github.com/kubeflow/kfserving/pkg/client/listers/serving/v1alpha2"
+	servingv1alpha2 "github.com/kserve/kserve/pkg/apis/serving/v1beta1"
+	servingclientset "github.com/kserve/kserve/pkg/client/clientset/versioned"
+	servinginformers "github.com/kserve/kserve/pkg/client/informers/externalversions"
+	servingv1alpha2listers "github.com/kserve/kserve/pkg/client/listers/serving/v1beta1"
 	"github.com/spf13/cobra"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -29,6 +30,9 @@ var dnsCmd = &cobra.Command{
 	Short: "Configure DNS resources",
 	Long:  `Configure DNS resources for inferences services`,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		ctx := context.Background()
+
 		// Setup signals so we can shutdown cleanly
 		stopCh := signals.SetupSignalHandler()
 
@@ -51,8 +55,7 @@ var dnsCmd = &cobra.Command{
 		// Setup informers
 		kubeInformerFactory := kubeinformers.NewSharedInformerFactory(kubeClient, time.Minute*5)
 		servingInformerFactory := servinginformers.NewSharedInformerFactory(servingClient, time.Minute*5)
-
-		inferenceServicesInformer := servingInformerFactory.Serving().V1alpha2().InferenceServices()
+		inferenceServicesInformer := servingInformerFactory.Serving().V1beta1().InferenceServices()
 
 		update := func() {
 			conf, err := generateDNS(inferenceServicesInformer.Lister())
@@ -66,7 +69,7 @@ var dnsCmd = &cobra.Command{
 			}
 
 			components := strings.Split(configMapName, "/")
-			existingConfigMap, err := kubeClient.CoreV1().ConfigMaps(components[0]).Get(components[1], metav1.GetOptions{})
+			existingConfigMap, err := kubeClient.CoreV1().ConfigMaps(components[0]).Get(ctx, components[1], metav1.GetOptions{})
 			if err != nil {
 				klog.Errorf("Failed to load existing configmap: %v", err)
 			}
@@ -78,6 +81,7 @@ var dnsCmd = &cobra.Command{
 			if existing, ok := existingConfigMap.Data[configMapKey]; ok {
 				if existing != conf {
 					update = true
+
 					updated.Data[configMapKey] = fmt.Sprintf(stubConf, conf)
 				}
 			} else {
@@ -86,7 +90,7 @@ var dnsCmd = &cobra.Command{
 			}
 
 			if update {
-				_, err := kubeClient.CoreV1().ConfigMaps(components[0]).Update(updated)
+				_, err := kubeClient.CoreV1().ConfigMaps(components[0]).Update(ctx, updated, metav1.UpdateOptions{})
 				if err != nil {
 					klog.Errorf("Failed to update ConfigMap: %v", err)
 				}
@@ -148,7 +152,7 @@ func generateDNS(inferenceServiceLister servingv1alpha2listers.InferenceServiceL
 
 	for _, inferenceService := range inferenceServices {
 		if inferenceService.Status.IsReady() {
-			entries = append(entries, fmt.Sprintf("rewrite name %s %s", strings.ReplaceAll(inferenceService.Status.URL, "http://", ""), aliasServiceName))
+			entries = append(entries, fmt.Sprintf("rewrite name %s %s", strings.ReplaceAll(inferenceService.Status.URL.Host, "http://", ""), aliasServiceName))
 		}
 	}
 
