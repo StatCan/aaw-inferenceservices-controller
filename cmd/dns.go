@@ -53,12 +53,16 @@ var dnsCmd = &cobra.Command{
 		servingInformerFactory := servinginformers.NewSharedInformerFactory(servingClient, time.Minute*5)
 
 		inferenceServicesInformer := servingInformerFactory.Serving().V1alpha2().InferenceServices()
-		// configMapsInformer := kubeInformerFactory.Core().V1().ConfigMaps()
 
 		update := func() {
 			conf, err := generateDNS(inferenceServicesInformer.Lister())
 			if err != nil {
 				klog.Errorf("Failed to generate initial DNS config: %v", err)
+			}
+
+			if conf == "" {
+				klog.Info("No DNS entries...")
+				return
 			}
 
 			components := strings.Split(configMapName, "/")
@@ -69,15 +73,16 @@ var dnsCmd = &cobra.Command{
 
 			update := false
 			updated := existingConfigMap.DeepCopy()
+			stubConf := "%s\n"
 
 			if existing, ok := existingConfigMap.Data[configMapKey]; ok {
 				if existing != conf {
 					update = true
-					updated.Data[configMapKey] = conf
+					updated.Data[configMapKey] = fmt.Sprintf(stubConf, conf)
 				}
 			} else {
 				update = true
-				updated.Data[configMapKey] = conf
+				updated.Data[configMapKey] = fmt.Sprintf(stubConf, conf)
 			}
 
 			if update {
@@ -113,24 +118,13 @@ var dnsCmd = &cobra.Command{
 			},
 		})
 
-		// // Setup controller
-		// controller := inferenceservices.NewController(
-		// 	servingInformerFactory.Servcing().V1alpha2().InferenceServices(),
-		// 	func(inferenceService *servingv1alpha2.InferenceService) error {
-		// 		// Generate RBAC
-		// 		roles := generateRoles(profile)
-		// 		roleBindings := generateRoleBindings(profile)
-		// 		return nil
-		// 	}
-		// })
-
 		// Start informers
 		kubeInformerFactory.Start(stopCh)
 		servingInformerFactory.Start(stopCh)
 
 		// Wait for caches
 		klog.Info("Waiting for informer caches to sync")
-		if ok := cache.WaitForCacheSync(stopCh, inferenceServicesInformer.Informer().HasSynced /*, configMapsInformer.Informer().HasSynced */); !ok {
+		if ok := cache.WaitForCacheSync(stopCh, inferenceServicesInformer.Informer().HasSynced); !ok {
 			klog.Fatalf("failed to wait for caches to sync")
 		}
 		klog.Info("Informer caches synched")
